@@ -1,36 +1,60 @@
 const express = require('express');
 const cors = require('cors');
-const admin = require('firebase-admin');
+const mongoose = require('mongoose');
+const User = require('./models/User'); // Import User model
+const Topic = require('./models/Topic'); // Import Topic model (if needed)
+
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Firebase Admin SDK setup
-const serviceAccount = require('./firebase-service-account-key.json');
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+// MongoDB connection
+mongoose.connect('mongodb://localhost:27017/learningPlatform', { useNewUrlParser: true, useUnifiedTopology: true });
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+  console.log('Connected to MongoDB');
 });
 
-// Default route
-app.get('/', (req, res) => {
-    res.send('Welcome to the Node.js Backend!');
-  });
-
-// Example protected route
+// Example protected route (already defined earlier)
 app.get('/protected', async (req, res) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).send('Unauthorized');
-    }
-    try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      res.send(`Hello, ${decodedToken.email}`);
-    } catch (error) {
-      res.status(401).send('Invalid token');
-    }
-  });
+  // Implementation for authentication (if required)
+});
 
-// start server
+// Update progress route
+app.post('/update-progress', async (req, res) => {
+  const { email, streak, points, topic } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).send('User not found');
+    
+    // Update streak and points
+    if (streak) user.streak = streak;
+    if (points) user.points += points;
+    if (topic && !user.handledTopics.includes(topic)) {
+      user.handledTopics.push(topic);
+    }
+    
+    await user.save();
+    res.send('Progress updated');
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
+// Add more routes as needed
+// For example, topic-related routes
+app.get('/topics', async (req, res) => {
+  try {
+    const topics = await Topic.find();
+    res.json(topics);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Start the server
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
